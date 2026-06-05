@@ -36,6 +36,8 @@ import {
   RefreshCw,
   Send,
   CheckCircle,
+  MapPin,
+  Mail,
 } from "lucide-react";
 
 // --- PURITY AND STATISTICS ROLL HELPER (TOP-LEVEL DECLARED) ---
@@ -424,7 +426,10 @@ export default function GamifiedPortfolio() {
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [senderName, setSenderName] = useState("");
   const [senderEmail, setSenderEmail] = useState("");
+  const [senderSubject, setSenderSubject] = useState("");
   const [senderMessage, setSenderMessage] = useState("");
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const unlockAchievement = (id: string) => {
     setAchievements((prev) =>
@@ -654,13 +659,44 @@ export default function GamifiedPortfolio() {
     }
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!senderName || !senderEmail || !senderMessage) return;
+    if (!senderName || !senderEmail || !senderSubject || !senderMessage) return;
 
-    soundEngine.playQuestUnlock();
-    setFormSubmitted(true);
-    unlockAchievement("ach4");
+    setIsSubmittingForm(true);
+    setFormError(null);
+
+    try {
+      soundEngine.playHeal(); // Play immediate interaction sound
+      
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: senderName,
+          email: senderEmail,
+          subject: senderSubject,
+          message: senderMessage,
+        }),
+      });
+
+      const resData = await response.json();
+
+      if (!response.ok || resData.success === false) {
+        throw new Error(resData.error || "Failed to finalize message submission.");
+      }
+
+      soundEngine.playQuestUnlock(); // Play triumph sound
+      setFormSubmitted(true);
+      unlockAchievement("ach4");
+    } catch (err: any) {
+      console.error(err);
+      setFormError(err.message || "Unable to parse transmission packet down to active channels.");
+    } finally {
+      setIsSubmittingForm(false);
+    }
   };
 
   return (
@@ -1861,7 +1897,7 @@ export default function GamifiedPortfolio() {
             </motion.div>
           )}
 
-          {/* SCREEN: CONTACT ORACLE */}
+          {/* SCREEN: CONTACT ME */}
           {screen === "contact" && (
             <motion.div
               key="contact"
@@ -1870,117 +1906,225 @@ export default function GamifiedPortfolio() {
               exit={{ opacity: 0, y: -15 }}
               className="max-w-4xl w-full mx-auto px-4 py-8 select-none"
             >
-              <div className="mb-6 flex items-center space-x-3">
+              <div className="mb-8 flex items-center space-x-4">
                 <button
                   onClick={() => changeScreen("menu")}
-                  className="p-2 bg-slate-900 border border-slate-800 hover:border-emerald-500 text-slate-400 hover:text-emerald-400 rounded transition-colors whitespace-nowrap"
+                  className="p-2.5 bg-slate-900 border border-slate-800 hover:border-purple-500 text-slate-400 hover:text-purple-400 rounded transition-colors whitespace-nowrap cursor-pointer"
                   type="button"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <h2 className="text-3xl font-extrabold text-white uppercase tracking-wider font-mono">
-                  Contact Oracle
-                </h2>
+                <div>
+                  <div className="text-[10px] text-purple-400 uppercase font-mono tracking-widest font-bold">
+                    GET IN TOUCH
+                  </div>
+                  <h2 className="text-3xl font-black text-white uppercase tracking-wider font-mono">
+                    Let&apos;s Connect
+                  </h2>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-start">
-                <div className="md:col-span-2 bg-slate-950 border-2 border-emerald-950 rounded p-6 shadow-2xl relative">
-                  <div className="absolute -top-3.5 -left-3.5 w-10 h-10 bg-black border-[3px] border-emerald-950 rounded-full flex items-center justify-center text-emerald-400">
-                    <User className="w-5 h-5" />
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-stretch">
+                {/* Left Side: Contact details of Tamil Selvan K */}
+                <div className="md:col-span-2 bg-slate-950/95 border-2 border-slate-800/80 rounded-xl p-6 shadow-2xl flex flex-col justify-between space-y-6">
+                  <div className="space-y-4">
+                    <h3 className="text-white font-mono font-bold text-lg leading-tight">
+                      Let&apos;s design something great together.
+                    </h3>
+                    
+                    <p className="text-slate-400 text-xs leading-relaxed font-sans">
+                      I&apos;m always open to discussing new opportunities, interesting projects, or just having a chat about technology.
+                    </p>
                   </div>
-                  <h3 className="text-emerald-400 font-black text-xs uppercase tracking-widest mb-4 pl-4.5 border-b border-emerald-950/40 pb-2">
-                    The Oracle Node
-                  </h3>
-                  <div className="font-mono text-xs text-slate-400 leading-relaxed min-h-[140px]">
-                    <Typewriter
-                      text="Greetings, esteemed recruiter. You have successfully navigated Tamil Selvan's active code branches. To seal a raid contract (job offer/interview request), input your authorization keys inside the encrypted panel. I will broadcast your packet instantly."
-                      delay={25}
-                    />
+
+                  <div className="space-y-4 pt-4 border-t border-slate-900 font-mono text-[11px]">
+                    {/* Location Info Element */}
+                    <div className="flex items-start space-x-3 text-slate-300">
+                      <div className="p-2 bg-purple-950/40 border border-purple-900/50 rounded-lg text-purple-400 shrink-0">
+                        <MapPin className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-[9.5px] uppercase font-bold text-slate-500 tracking-wider">
+                          LOCATION
+                        </div>
+                        <div className="text-white text-[11.5px] font-bold">
+                          Chennai, Tamil Nadu, India
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Email Info Element */}
+                    <div className="flex items-start space-x-3 text-slate-300">
+                      <div className="p-2 bg-purple-950/40 border border-purple-900/50 rounded-lg text-purple-400 shrink-0">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-[9.5px] uppercase font-bold text-slate-500 tracking-wider">
+                          EMAIL ADDRESS
+                        </div>
+                        <a 
+                          href="mailto:tamilselvan.k.dev@gmail.com" 
+                          className="text-purple-400 hover:text-purple-300 text-[11.5px] font-bold underline transition-colors"
+                        >
+                          tamilselvan.k.dev@gmail.com
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Social Channels Connect */}
+                  <div className="pt-4 border-t border-slate-900 flex items-center justify-between">
+                    <div className="text-[10px] text-slate-500 uppercase tracking-wider font-mono font-bold">
+                      SOCIAL LINKS:
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <a
+                        href="https://github.com/tamil-selvan-k"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-500 rounded-lg transition-all"
+                        title="GitHub Profile"
+                      >
+                        <Github className="w-4 h-4" />
+                      </a>
+                      <a
+                        href="#"
+                        className="p-2 bg-slate-900 border border-slate-800 text-slate-400 hover:text-blue-400 hover:border-blue-500/50 rounded-lg transition-all"
+                        title="LinkedIn Profile"
+                      >
+                        <Linkedin className="w-4 h-4" />
+                      </a>
+                    </div>
                   </div>
                 </div>
 
-                <div className="md:col-span-3 bg-slate-900 border border-slate-800 p-6 md:p-8 rounded shadow-2xl relative">
+                {/* Right Side: Contact Submission Panel */}
+                <div className="md:col-span-3 bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-xl shadow-2xl relative flex flex-col justify-center">
                   {formSubmitted ? (
                     <div className="text-center py-10 font-mono">
-                      <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4 animate-bounce" />
-                      <h4 className="text-xl font-bold text-white uppercase mb-2">FREQUENCY LOCKED!</h4>
-                      <p className="text-xs text-slate-400 max-w-xs mx-auto mb-5 leading-normal">
-                        Your transaction message packet has been transmitted. The Tamil Selvan K node will parse your metadata shortly.
+                      <CheckCircle className="w-16 h-16 text-purple-400 mx-auto mb-4 animate-bounce" />
+                      <h4 className="text-lg font-black text-white uppercase tracking-wider mb-2">
+                        Message sent successfully!
+                      </h4>
+                      <p className="text-xs text-slate-400 max-w-sm mx-auto mb-6 leading-relaxed">
+                        Thank you for reaching out! Your message transmission has completed. I will review your inquiry and get back to you shortly.
                       </p>
                       <button
                         onClick={() => {
                           setFormSubmitted(false);
                           setSenderName("");
                           setSenderEmail("");
+                          setSenderSubject("");
                           setSenderMessage("");
                         }}
-                        className="px-5 py-2.5 bg-slate-950 border border-slate-800 text-slate-400 hover:text-white rounded uppercase text-xs cursor-pointer"
+                        className="px-5 py-2.5 bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-purple-500 rounded-lg uppercase text-xs font-bold transition-all cursor-pointer"
                       >
-                        Send New Packet [Tx]
+                        Send Another Message
                       </button>
                     </div>
                   ) : (
-                    <form onSubmit={handleFormSubmit} className="space-y-5 font-mono">
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="senderName"
-                          className="text-[10px] text-emerald-400 uppercase font-bold tracking-widest pl-0.5"
-                        >
-                          Challenger Designation (Your Name)
-                        </label>
-                        <input
-                          type="text"
-                          id="senderName"
-                          required
-                          value={senderName}
-                          onChange={(e) => setSenderName(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded text-white focus:outline-none focus:border-emerald-500 font-mono text-xs transition-colors"
-                          placeholder="Your designation key..."
-                        />
+                    <form onSubmit={handleFormSubmit} className="space-y-5">
+                      {/* Diagnostic Error Banner */}
+                      {formError && (
+                        <div className="p-3.5 bg-red-950/40 border border-red-900 text-red-300 rounded-lg text-xs font-mono leading-relaxed">
+                          <strong className="text-red-400 uppercase">Error Details:</strong> {formError}
+                        </div>
+                      )}
+
+                      <div className="space-y-5">
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor="senderName"
+                            className="text-[10px] text-purple-400 uppercase font-mono font-bold tracking-widest pl-0.5"
+                          >
+                            Your Name
+                          </label>
+                          <input
+                            type="text"
+                            id="senderName"
+                            required
+                            disabled={isSubmittingForm}
+                            value={senderName}
+                            onChange={(e) => setSenderName(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500 font-sans transition-colors disabled:opacity-50"
+                            placeholder="What is your name?"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor="senderEmail"
+                            className="text-[10px] text-purple-400 uppercase font-mono font-bold tracking-widest pl-0.5"
+                          >
+                            Your Email Address
+                          </label>
+                          <input
+                            type="email"
+                            id="senderEmail"
+                            required
+                            disabled={isSubmittingForm}
+                            value={senderEmail}
+                            onChange={(e) => setSenderEmail(e.target.value)}
+                            className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500 font-sans transition-colors disabled:opacity-50"
+                            placeholder="Your email address"
+                          />
+                        </div>
                       </div>
 
                       <div className="space-y-1.5">
                         <label
-                          htmlFor="senderEmail"
-                          className="text-[10px] text-emerald-400 uppercase font-bold tracking-widest pl-0.5"
+                          htmlFor="senderSubject"
+                          className="text-[10px] text-purple-400 uppercase font-mono font-bold tracking-widest pl-0.5"
                         >
-                          Target Broadcast Address (Your Email)
+                          Subject
                         </label>
                         <input
-                          type="email"
-                          id="senderEmail"
+                          type="text"
+                          id="senderSubject"
                           required
-                          value={senderEmail}
-                          onChange={(e) => setSenderEmail(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded text-white focus:outline-none focus:border-emerald-500 font-mono text-xs transition-colors"
-                          placeholder="Enter secure comm address..."
+                          disabled={isSubmittingForm}
+                          value={senderSubject}
+                          onChange={(e) => setSenderSubject(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500 font-sans transition-colors disabled:opacity-50"
+                          placeholder="What is this regarding?"
                         />
                       </div>
 
                       <div className="space-y-1.5">
                         <label
                           htmlFor="senderMessage"
-                          className="text-[10px] text-emerald-400 uppercase font-bold tracking-widest pl-0.5"
+                          className="text-[10px] text-purple-400 uppercase font-mono font-bold tracking-widest pl-0.5"
                         >
-                          Message payload scroll
+                          Your Message
                         </label>
                         <textarea
                           id="senderMessage"
                           required
+                          disabled={isSubmittingForm}
                           value={senderMessage}
                           onChange={(e) => setSenderMessage(e.target.value)}
                           rows={4}
-                          className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded text-white focus:outline-none focus:border-emerald-500 font-mono text-xs transition-colors resize-none"
-                          placeholder="Write encrypted scroll specs..."
+                          className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500 font-sans transition-colors resize-none disabled:opacity-50"
+                          placeholder="Write your message detail here..."
                         />
                       </div>
 
                       <button
                         type="submit"
-                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-black font-extrabold uppercase text-xs rounded tracking-wider flex items-center justify-center space-x-1.5 cursor-pointer shadow transition-all border-[2px] border-emerald-400"
+                        disabled={isSubmittingForm}
+                        className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800/50 text-white font-extrabold uppercase text-xs rounded-lg tracking-wider flex items-center justify-center space-x-2 cursor-pointer shadow transition-all border border-purple-400 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Send className="w-4 h-4" />
-                        <span>Authorize Transmission Packet</span>
+                        {isSubmittingForm ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
+                            <span>Transmitting Message...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 text-purple-200" />
+                            <span>Send Message</span>
+                          </>
+                        )}
                       </button>
                     </form>
                   )}
