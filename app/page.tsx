@@ -383,6 +383,25 @@ export default function GamifiedPortfolio() {
   >("boot");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [backendUrlState, setBackendUrlState] = useState(process.env.vitebackendurl || "");
+
+  // Load dynamic absolute backend URL at runtime (resolves build vs run discrepancy)
+  useEffect(() => {
+    async function loadBackendUrl() {
+      try {
+        const response = await fetch("/api/config");
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.vitebackendurl) {
+            setBackendUrlState(data.vitebackendurl);
+          }
+        }
+      } catch (err) {
+        console.warn("Dynamic backend URL lookup omitted, using build default.", err);
+      }
+    }
+    loadBackendUrl();
+  }, []);
 
   // Auto-transition from boot to title screen
   useEffect(() => {
@@ -457,6 +476,10 @@ export default function GamifiedPortfolio() {
 
   const changeScreen = (newScreen: typeof screen) => {
     soundEngine.playSelect();
+    if (newScreen === "contact") {
+      window.location.href = "https://tamil-selvan-k.vercel.app/#contact";
+      return;
+    }
     setIsTransitioning(true);
     setTimeout(() => {
       setScreen(newScreen);
@@ -669,10 +692,35 @@ export default function GamifiedPortfolio() {
     try {
       soundEngine.playHeal(); // Play immediate interaction sound
       
-      const response = await fetch("/api/contact", {
+      let resolvedBackendUrl = (backendUrlState || process.env.vitebackendurl || "").trim();
+      if (resolvedBackendUrl === "undefined" || resolvedBackendUrl === "null") {
+        resolvedBackendUrl = "";
+      }
+
+      // Check if URL is unconfigured or a dummy placeholder
+      const isPlaceholder = !resolvedBackendUrl || 
+                            resolvedBackendUrl.includes("your-express-backend") || 
+                            resolvedBackendUrl.includes("example.com") ||
+                            resolvedBackendUrl.includes("your-backend") ||
+                            resolvedBackendUrl.includes("placeholder");
+
+      if (isPlaceholder) {
+        throw new Error(
+          `Backend URL is not configured. Please set 'vitebackendurl' to your real absolute Express server endpoint in the Secrets panel in AI Studio Settings. (Currently resolved to: "${resolvedBackendUrl || "empty"}")`
+        );
+      }
+
+      // Build clean absolute URL without trailing slash duplication
+      const baseApiUrl = resolvedBackendUrl.replace(/\/$/, "");
+      const fetchUrl = `${baseApiUrl}/contact`;
+
+      console.log(`[Form Transmission] Dispatching packet to absolute endpoint: ${fetchUrl}`);
+
+      const response = await fetch(fetchUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept": "application/json",
         },
         body: JSON.stringify({
           name: senderName,
@@ -682,18 +730,39 @@ export default function GamifiedPortfolio() {
         }),
       });
 
-      const resData = await response.json();
+      let resData: any = {};
+      try {
+        const resText = await response.text();
+        if (resText) {
+          try {
+            resData = JSON.parse(resText);
+          } catch {
+            // Non-JSON plaintext response from server/proxy
+            resData = { success: response.ok, error: resText.substring(0, 250) };
+          }
+        } else {
+          resData = { success: response.ok };
+        }
+      } catch (err) {
+        resData = { success: response.ok, error: `Could not parse response stream: ${err}` };
+      }
 
       if (!response.ok || resData.success === false) {
-        throw new Error(resData.error || "Failed to finalize message submission.");
+        const errorDetail = resData.error || resData.message || `HTTP Status Code ${response.status}`;
+        throw new Error(`Server Response Error: ${errorDetail} (Target Endpoint: ${fetchUrl})`);
       }
 
       soundEngine.playQuestUnlock(); // Play triumph sound
       setFormSubmitted(true);
       unlockAchievement("ach4");
     } catch (err: any) {
-      console.error(err);
-      setFormError(err.message || "Unable to parse transmission packet down to active channels.");
+      console.error("[Form Submit Error Details]:", err);
+      // Give extremely precise advice regarding typical absolute URL/CORS/DNS issues
+      let friendlyError = err.message || "Unknown socket connection disruption.";
+      if (friendlyError.includes("Failed to fetch") || friendlyError.includes("NetworkError")) {
+        friendlyError = `Network / CORS Connection Blocked. Ensure your Express backend at "${backendUrlState || "unspecified URL"}" is running, has CORS enabled (allowing the Applet's origin), and accepts POST requests on the "/contact" endpoint.`;
+      }
+      setFormError(friendlyError);
     } finally {
       setIsSubmittingForm(false);
     }
@@ -1926,7 +1995,7 @@ export default function GamifiedPortfolio() {
 
               <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-stretch">
                 {/* Left Side: Contact details of Tamil Selvan K */}
-                <div className="md:col-span-2 bg-slate-950/95 border-2 border-slate-800/80 rounded-xl p-6 shadow-2xl flex flex-col justify-between space-y-6">
+                <div className="md:col-span-2 bg-slate-900/90 border border-slate-800 rounded-xl p-6 md:p-8 shadow-2xl flex flex-col justify-between space-y-6">
                   <div className="space-y-4">
                     <h3 className="text-white font-mono font-bold text-lg leading-tight">
                       Let&apos;s design something great together.
@@ -1998,136 +2067,26 @@ export default function GamifiedPortfolio() {
                   </div>
                 </div>
 
-                {/* Right Side: Contact Submission Panel */}
-                <div className="md:col-span-3 bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-xl shadow-2xl relative flex flex-col justify-center">
-                  {formSubmitted ? (
-                    <div className="text-center py-10 font-mono">
-                      <CheckCircle className="w-16 h-16 text-purple-400 mx-auto mb-4 animate-bounce" />
-                      <h4 className="text-lg font-black text-white uppercase tracking-wider mb-2">
-                        Message sent successfully!
-                      </h4>
-                      <p className="text-xs text-slate-400 max-w-sm mx-auto mb-6 leading-relaxed">
-                        Thank you for reaching out! Your message transmission has completed. I will review your inquiry and get back to you shortly.
-                      </p>
-                      <button
-                        onClick={() => {
-                          setFormSubmitted(false);
-                          setSenderName("");
-                          setSenderEmail("");
-                          setSenderSubject("");
-                          setSenderMessage("");
-                        }}
-                        className="px-5 py-2.5 bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-purple-500 rounded-lg uppercase text-xs font-bold transition-all cursor-pointer"
-                      >
-                        Send Another Message
-                      </button>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleFormSubmit} className="space-y-5">
-                      {/* Diagnostic Error Banner */}
-                      {formError && (
-                        <div className="p-3.5 bg-red-950/40 border border-red-900 text-red-300 rounded-lg text-xs font-mono leading-relaxed">
-                          <strong className="text-red-400 uppercase">Error Details:</strong> {formError}
-                        </div>
-                      )}
-
-                      <div className="space-y-5">
-                        <div className="space-y-1.5">
-                          <label
-                            htmlFor="senderName"
-                            className="text-[10px] text-purple-400 uppercase font-mono font-bold tracking-widest pl-0.5"
-                          >
-                            Your Name
-                          </label>
-                          <input
-                            type="text"
-                            id="senderName"
-                            required
-                            disabled={isSubmittingForm}
-                            value={senderName}
-                            onChange={(e) => setSenderName(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500 font-sans transition-colors disabled:opacity-50"
-                            placeholder="What is your name?"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label
-                            htmlFor="senderEmail"
-                            className="text-[10px] text-purple-400 uppercase font-mono font-bold tracking-widest pl-0.5"
-                          >
-                            Your Email Address
-                          </label>
-                          <input
-                            type="email"
-                            id="senderEmail"
-                            required
-                            disabled={isSubmittingForm}
-                            value={senderEmail}
-                            onChange={(e) => setSenderEmail(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500 font-sans transition-colors disabled:opacity-50"
-                            placeholder="Your email address"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="senderSubject"
-                          className="text-[10px] text-purple-400 uppercase font-mono font-bold tracking-widest pl-0.5"
-                        >
-                          Subject
-                        </label>
-                        <input
-                          type="text"
-                          id="senderSubject"
-                          required
-                          disabled={isSubmittingForm}
-                          value={senderSubject}
-                          onChange={(e) => setSenderSubject(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500 font-sans transition-colors disabled:opacity-50"
-                          placeholder="What is this regarding?"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="senderMessage"
-                          className="text-[10px] text-purple-400 uppercase font-mono font-bold tracking-widest pl-0.5"
-                        >
-                          Your Message
-                        </label>
-                        <textarea
-                          id="senderMessage"
-                          required
-                          disabled={isSubmittingForm}
-                          value={senderMessage}
-                          onChange={(e) => setSenderMessage(e.target.value)}
-                          rows={4}
-                          className="w-full bg-slate-950 border border-slate-800 px-4 py-3 rounded-lg text-white text-xs focus:outline-none focus:border-purple-500 font-sans transition-colors resize-none disabled:opacity-50"
-                          placeholder="Write your message detail here..."
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isSubmittingForm}
-                        className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800/50 text-white font-extrabold uppercase text-xs rounded-lg tracking-wider flex items-center justify-center space-x-2 cursor-pointer shadow transition-all border border-purple-400 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isSubmittingForm ? (
-                          <>
-                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent" />
-                            <span>Transmitting Message...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4 text-purple-200" />
-                            <span>Send Message</span>
-                          </>
-                        )}
-                      </button>
-                    </form>
-                  )}
+                {/* Right Side: Contact Redirect Panel */}
+                <div className="md:col-span-3 bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-xl shadow-2xl relative flex flex-col justify-center items-center text-center space-y-6">
+                  <div className="p-4 bg-purple-950/20 border border-purple-900 rounded-full text-purple-400">
+                    <MessageSquare className="w-10 h-10 animate-pulse" />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-xl font-black text-white uppercase tracking-wider font-mono">
+                      Visit Main Portfolio
+                    </h4>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                      The internal contact channels have been redirected. Please visit my official portfolio portal to connect, schedule a meeting, or send direct inquiries.
+                    </p>
+                  </div>
+                  <a
+                    href="https://tamil-selvan-k.vercel.app/#contact"
+                    className="w-full py-4 bg-purple-600 hover:bg-purple-500 hover:scale-[1.01] active:scale-[0.99] text-white font-extrabold uppercase text-xs rounded-lg tracking-widest flex items-center justify-center space-x-2.5 cursor-pointer shadow-lg border border-purple-400 transition-all font-mono"
+                  >
+                    <span>Connect At Vercel Portal</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </a>
                 </div>
               </div>
             </motion.div>

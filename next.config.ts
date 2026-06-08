@@ -2,6 +2,9 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  env: {
+    vitebackendurl: process.env.vitebackendurl || process.env.VITE_BACKEND_URL || "",
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
