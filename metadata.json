@@ -1,5 +1,5 @@
 {
-  "name": "NEON-PORTFOLIO.exe",
+  "name": "Tamil-portfolio.exe",
   "description": "A gamer-style developer portfolio featuring an achievement-based project gallery, skill trees, and CLI aesthetics with neon green accents.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
