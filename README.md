@@ -63,11 +63,3 @@ The portfolio showcases multiple projects, including:
 ## Tech Stack
 
 Based on the live portfolio content, this project is centered around frontend technologies such as HTML, CSS, JavaScript, and Bootstrap. Some showcased projects also mention JSON-based storage, local storage, Fetch API usage, and Flask integration for project-specific functionality.
-
-## Why this portfolio stands out
-
-- Clean developer-focused personal branding
-- Strong emphasis on responsiveness and usability
-- Project descriptions written with outcomes and impact
-- Good mix of technical and soft-skill presentation
-- Suitable foundation for internship and entry-level developer applications
